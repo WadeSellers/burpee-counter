@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Burpee Counter</title>
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Burpees">
 <style>
   html, body {
     margin: 0;
@@ -166,6 +173,32 @@
     text-align: center;
     font-size: 0.85rem;
     opacity: 0.5;
+  }
+  #daybadge {
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: #FFD700;
+    line-height: 1;
+    white-space: nowrap;
+    margin-bottom: 1vh;
+  }
+  #daybadge.hidden { display: none; }
+  .optfield {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    color-scheme: dark;
+  }
+  .opthint {
+    font-size: 0.8rem;
+    opacity: 0.55;
+    margin: 6px 0 2px;
   }
   #voice.on {
     opacity: 0.9;
@@ -363,6 +396,7 @@
 </head>
 <body>
 <div class="wrap" id="tapzone">
+  <div id="daybadge" class="hidden"></div>
   <h1 id="title">Burpee Counter</h1>
   <div id="count">0</div>
   <div id="timer">00:00.00</div>
@@ -375,8 +409,8 @@
     <h2>Counting</h2>
     <ul>
       <li><kbd>Space</kbd> or tap anywhere &mdash; count one rep. Rep 1 starts the clock.</li>
-      <li>Every rep lands with a random animation: flips, drops, spins, slot-machine scrambles, and more</li>
-      <li><kbd>O</kbd> or the Options button &mdash; lock in one animation style, or set it back to Random</li>
+      <li>Every rep lands with the jelly animation. <kbd>O</kbd> or Options &mdash; pick another move (flips, drops, spins, slot scrambles...) or go Random. Saved on this device.</li>
+      <li>Options also sets the DAY badge date and the end card phrases</li>
       <li>Voice on: say the rep number (<span class="say">"fourteen"</span>) and the counter jumps to it. Missed one? The next number you say resyncs it.</li>
     </ul>
     <h2>Timer</h2>
@@ -408,18 +442,25 @@
   <div class="card" id="optsCard">
     <h2>Count animation</h2>
     <div class="chips">
-      <button class="chip sel" data-anim="random"><span class="mini">7</span>Random (all of them)</button>
+      <button class="chip" data-anim="random"><span class="mini">7</span>Random (all of them)</button>
       <button class="chip" data-anim="zoom"><span class="mini">7</span>Zoom pop</button>
       <button class="chip" data-anim="drop"><span class="mini">7</span>Sky drop</button>
       <button class="chip" data-anim="spin"><span class="mini">7</span>Spin</button>
-      <button class="chip" data-anim="jelly"><span class="mini">7</span>Jelly</button>
+      <button class="chip sel" data-anim="jelly"><span class="mini">7</span>Jelly</button>
       <button class="chip" data-anim="neon"><span class="mini">7</span>Neon flicker</button>
       <button class="chip" data-anim="flip"><span class="mini">7</span>Flip board</button>
       <button class="chip" data-anim="punch"><span class="mini">7</span>Punch</button>
       <button class="chip" data-anim="odo"><span class="mini">7</span>Odometer</button>
       <button class="chip" data-anim="scramble"><span class="mini">7</span>Slot scramble</button>
     </div>
-    <div class="close-hint">The little numbers show each move live. Pick one to lock it in. Goes back to Random when the page reloads.</div>
+    <div class="opthint">The little numbers show each move live. Pick one to lock it in &mdash; saved on this device.</div>
+    <h2>Day counter</h2>
+    <input type="date" id="startDate" class="optfield">
+    <div class="opthint">Day 1 date. The gold DAY badge counts up from here &mdash; clear the date to hide it.</div>
+    <h2>End card phrases</h2>
+    <textarea id="ctaText" class="optfield" rows="5" spellcheck="false" placeholder="FOLLOW&#10;LIKE&#10;SHARE THIS&#10;100 EVERY DAY&#10;SEE YOU TOMORROW"></textarea>
+    <div class="opthint">One per line &mdash; shout-outs welcome ("THANKS @NANCY462"). {day} becomes the day number. Lines with LIKE get the beating heart. Empty = the standard loop.</div>
+    <div class="close-hint">Tap outside the card to close</div>
   </div>
 </div>
 <div id="celebrate">
@@ -440,11 +481,26 @@
   const title = document.getElementById('title');
   const timerEl = document.getElementById('timer');
   const voiceBtn = document.getElementById('voice');
+  const dayBadge = document.getElementById('daybadge');
+
+  // Tiny persistence layer — settings survive reloads on this device.
+  const store = {
+    get(k, d) {
+      try {
+        const v = localStorage.getItem('bc_' + k);
+        return v === null ? d : JSON.parse(v);
+      } catch (e) { return d; }
+    },
+    set(k, v) {
+      try { localStorage.setItem('bc_' + k, JSON.stringify(v)); } catch (e) {}
+    }
+  };
 
   function fitText(node, maxW, maxH) {
     node.style.fontSize = '100px';
     const w = node.offsetWidth;
     const h = node.offsetHeight;
+    if (!w || !h) return;
     const scale = Math.min(maxW / w, maxH / h);
     node.style.fontSize = (100 * scale) + 'px';
   }
@@ -452,8 +508,10 @@
   function fit() {
     const W = window.innerWidth * 0.97;
     const H = window.innerHeight * 0.97;
-    fitText(title, W, H * 0.16);
-    fitText(el, W, H * 0.60);
+    const hasBadge = !dayBadge.classList.contains('hidden');
+    if (hasBadge) fitText(dayBadge, W * 0.5, H * 0.06);
+    fitText(title, W, H * (hasBadge ? 0.14 : 0.16));
+    fitText(el, W, H * (hasBadge ? 0.56 : 0.60));
     fitText(timerEl, W * 0.9, H * 0.18);
   }
 
@@ -537,7 +595,7 @@
   // The big number and every menu preview share this one engine, so what a
   // chip shows is exactly what the big number will do.
   let lastAnim = null;
-  let animMode = 'random';
+  let animMode = store.get('animMode', 'jelly'); // jelly is the default; validated after ANIMS is defined
 
   function makeAnimState(node, useFit) {
     return { node: node, gen: 0, cls: null, useFit: useFit };
@@ -714,6 +772,7 @@
       return;
     }
     voiceOn = !voiceOn;
+    store.set('voiceOn', voiceOn);
     if (voiceOn) {
       if (!recognition) recognition = buildRecognition();
       try { recognition.start(); } catch (e) {}
@@ -802,6 +861,19 @@
     { text: 'SEE YOU TOMORROW', anim: 'wiggle2' }
   ];
 
+  // Custom end-card phrases (Options menu). Empty = the standard loop above.
+  const CTA_ANIM_CYCLE = ['wave', 'slam2', 'bounce2', 'wiggle2', 'beat'];
+  let customCta = store.get('ctaLines', []);
+
+  function activeCtaPhrases() {
+    if (!customCta.length) return CTA_PHRASES;
+    return customCta.map((line, i) => {
+      const text = line.replace(/\{day\}/gi, String(dayNumber() || '?')).toUpperCase();
+      const heart = text.indexOf('LIKE') !== -1;
+      return { text: text, anim: heart ? 'beat' : CTA_ANIM_CYCLE[i % CTA_ANIM_CYCLE.length], heart: heart };
+    });
+  }
+
   function renderPhrase(p) {
     cBig.className = '';
     if (p.heart) {
@@ -829,11 +901,12 @@
   function startCta() {
     let idx = 0;
     let flip = false;
+    const phrases = activeCtaPhrases();
     celebrate.classList.add('cta');
     cLabel.textContent = '';
     // final time stays on screen in #c-time
     function nextPhrase() {
-      const p = CTA_PHRASES[idx % CTA_PHRASES.length];
+      const p = phrases[idx % phrases.length];
       idx++;
       flip = !flip;
       celebrate.classList.toggle('invert', flip);
@@ -887,7 +960,7 @@
     if (!bestRank) return;
     if (bestRank === 4) {
       if (running) stopClock(); // lock the final time
-      showCelebrate({ big: '100', label: 'Done', time: timerEl.textContent, confetti: 140, sticky: true });
+      showCelebrate({ big: '100', label: dayNumber() > 0 ? 'Day ' + dayNumber() + ' done' : 'Done', time: timerEl.textContent, confetti: 140, sticky: true });
       ctaTimeout = setTimeout(startCta, 4000);
     } else if (bestRank === 3) {
       showCelebrate({ big: '50', label: 'Halfway', invert: true, confetti: 80, duration: 2500 });
@@ -913,6 +986,11 @@
       return;
     }
     if (optsOverlay.classList.contains('open')) {
+      const tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea') {
+        if (e.key === 'Escape') closeOpts();
+        return; // let typing through
+      }
       e.preventDefault();
       closeOpts();
       return;
@@ -956,6 +1034,7 @@
     chip.addEventListener('click', (e) => {
       e.stopPropagation();
       animMode = chip.dataset.anim;
+      store.set('animMode', animMode);
       optsOverlay.querySelectorAll('.chip').forEach((c) => c.classList.toggle('sel', c === chip));
       closeOpts();
       if (animMode !== 'random') {
@@ -1000,7 +1079,60 @@
     toggleVoice();
   });
 
+  /* ---------- Day badge ---------- */
+
+  const startDateInput = document.getElementById('startDate');
+  let startDate = store.get('startDate', '2026-07-02');
+
+  function dayNumber() {
+    if (!startDate) return 0;
+    const p = startDate.split('-').map(Number);
+    if (p.length !== 3 || !p[0]) return 0;
+    const start = new Date(p[0], p[1] - 1, p[2]);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diff = Math.round((today - start) / 86400000);
+    return diff >= 0 ? diff + 1 : 0;
+  }
+
+  function renderBadge() {
+    const d = dayNumber();
+    const text = d > 0 ? 'DAY ' + d : '';
+    if (text === dayBadge.textContent) return;
+    dayBadge.textContent = text;
+    dayBadge.classList.toggle('hidden', !text);
+    fit();
+  }
+
+  startDateInput.value = startDate || '';
+  startDateInput.addEventListener('change', () => {
+    startDate = startDateInput.value;
+    store.set('startDate', startDate);
+    renderBadge();
+  });
+  setInterval(renderBadge, 60000); // rolls the badge over at midnight
+
+  /* ---------- End-card phrase editor ---------- */
+
+  const ctaText = document.getElementById('ctaText');
+  ctaText.value = customCta.join('\n');
+  ctaText.addEventListener('input', () => {
+    customCta = ctaText.value.split('\n').map((s) => s.trim()).filter(Boolean);
+    store.set('ctaLines', customCta);
+  });
+
+  /* ---------- Restore saved settings ---------- */
+
+  if (animMode !== 'random' && !ANIMS[animMode]) animMode = 'jelly';
+  optsOverlay.querySelectorAll('.chip').forEach((c) => c.classList.toggle('sel', c.dataset.anim === animMode));
+  if (store.get('voiceOn', false)) toggleVoice();
+
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+
   window.addEventListener('resize', fit);
+  renderBadge();
   fit();
 </script>
 </body>

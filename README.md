@@ -6,13 +6,13 @@ A fullscreen rep counter built for filming workout videos. Black screen, huge wh
 
 ## What this is, technically
 
-One self-contained file: `index.html`. Vanilla HTML, CSS, and JavaScript.
+One page of vanilla HTML, CSS, and JavaScript (`index.html`), plus a small PWA shell: `manifest.webmanifest`, `sw.js` (service worker), and three PNG icons.
 
 - No build step, no framework, no package.json, no external dependencies.
 - No network calls except the browser's built-in speech recognition (Web Speech API).
 - Deployed as-is via GitHub Pages from the repo root.
-
-Open the file locally or visit the live URL. That is the entire stack.
+- Installable: on iPhone/Android use Share > Add to Home Screen. It launches fullscreen like a native app, and the service worker keeps it working offline (voice excepted).
+- Settings persist per device via localStorage (keys prefixed `bc_`): animation style, voice on/off, day-one date, custom end card phrases.
 
 ## Controls and shortcuts
 
@@ -23,7 +23,7 @@ Open the file locally or visit the live URL. That is the entire stack.
 | `R` | Full reset (count and clock to zero) |
 | `V` or the Voice button (top left) | Toggle voice recognition. Red dot = listening. |
 | `E` | End-card mode: jump straight to the follow/like/share loop, for recording a clean outro clip |
-| `O` or the Options button (bottom left) | Open the animation options menu |
+| `O` or the Options button (bottom left) | Open the options menu: animation style, day-one date, end card phrases |
 | Guide button (bottom right) | In-app reference for all of the above |
 
 ### Voice commands
@@ -51,9 +51,13 @@ Voice needs Chrome (or another Chromium browser) and an internet connection; aud
 
 **End-card mode (`E`).** Jumps straight into that CTA loop with zero reps, so a clean outro clip can be screen-recorded once and reused in every edit.
 
-**Count animations.** Each rep lands with one of nine animations: zoom pop, sky drop, spin, jelly, neon flicker, flip board, punch, odometer, slot-machine scramble. Random by default, never the same one twice in a row.
+**Count animations.** Each rep lands with one of nine animations: zoom pop, sky drop, spin, jelly, neon flicker, flip board, punch, odometer, slot-machine scramble. Jelly is the default; Random mode rotates through all of them, never the same one twice in a row. The choice is remembered per device.
 
-**Options menu (`O`).** Lock in one animation style or return to Random. Every chip in the menu contains a live mini number that performs its animation on a loop while the menu is open, driven by the same engine as the big number (with chip-scaled keyframe overrides for the moves that travel in screen units). The demo loop starts when the menu opens and stops when it closes.
+**Day badge.** A gold "DAY N" badge above the title, computed from a day-one date set in Options (default 2026-07-02). It rolls over at local midnight, feeds the rep-100 finale label ("Day N done"), and is available to end card phrases via the `{day}` token. Clearing the date hides the badge and restores the original layout proportions.
+
+**Custom end card phrases.** The Options menu has a textarea, one phrase per line, that replaces the default FOLLOW/LIKE/SHARE loop (useful for day numbers and follower shout-outs, e.g. "THANKS @NANCY462"). `{day}` is substituted with the current day number, any line containing LIKE gets the beating heart treatment, and other lines rotate through the loop's animation set. Empty textarea = default loop. Persisted per device.
+
+**Options menu (`O`).** Animation style, day-one date, and end card phrases. Every animation chip contains a live mini number that performs its animation on a loop while the menu is open, driven by the same engine as the big number (with chip-scaled keyframe overrides for the moves that travel in screen units). The demo loop starts when the menu opens and stops when it closes. While the menu's text fields are focused, global shortcuts are suspended so typing a phrase can't fire reps or resets.
 
 ## Architecture notes
 
@@ -65,12 +69,6 @@ Voice needs Chrome (or another Chromium browser) and an internet connection; aud
 ## Known constraints
 
 - Voice recognition requires Chrome/Chromium plus an internet connection, and works poorly with whispering or heavy breathing.
-- No persistence: the animation-style choice and the count reset on reload. localStorage was deliberately not used because the file was originally built as a Claude artifact, where storage APIs are unavailable. Now that it is a hosted page, persistence is a straightforward future improvement.
+- The rep count itself intentionally resets on reload; only settings persist.
 - Mic permission on a `file://` URL is flaky in some browsers; the https URL from GitHub Pages avoids that.
-
-## Possible future improvements
-
-- Persist the animation-style choice (and voice on/off) in localStorage.
-- Web app manifest and icon so Add to Home Screen behaves like a proper app on a phone.
-- Editable CTA phrases (day numbers, follower shout-outs).
-- A "Day N" badge tied to the challenge day count.
+- The service worker is network-first: online visitors always get the newest version, and the cache is only a fallback for offline use.
