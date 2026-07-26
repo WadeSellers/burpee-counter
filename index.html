@@ -819,6 +819,7 @@
   let ctaInterval = null;
   let ctaTimeout = null;
   let shoutTimeout = null;
+  let shoutInterval = null;
 
   const PALETTE = ['#FFD700', '#ffffff', '#bbbbbb', '#FFD700'];
   const PALETTE_INVERT = ['#FFD700', '#111111', '#555555', '#FFD700'];
@@ -852,6 +853,7 @@
     if (celebrateTimer) { clearTimeout(celebrateTimer); celebrateTimer = null; }
     if (ctaInterval) { clearInterval(ctaInterval); ctaInterval = null; }
     if (ctaTimeout) { clearTimeout(ctaTimeout); ctaTimeout = null; }
+    if (shoutInterval) { clearInterval(shoutInterval); shoutInterval = null; }
   }
 
   function showCelebrate(opts) {
@@ -957,6 +959,54 @@
     requestWake();
   }
 
+  /* Rep-50 follower feature: a three-beat mini-show, not a flash card.
+     SHOUT OUT slams in with sparks, the screen flips white with the handle
+     in a letter wave between stars, then flips back with the handle in gold
+     plus a compliment line. Confetti on every beat. Taps pass through. */
+
+  const SHOUT_LINES = ['YOU SHOWED UP', 'LEGEND', 'APPRECIATE YOU', 'THANKS FOR THE FUEL', 'BIG ENERGY'];
+
+  function shoutSparks() {
+    for (let i = 0; i < 24; i++) {
+      const s = document.createElement('div');
+      s.className = 'spark';
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 20 + Math.random() * 30;
+      s.style.setProperty('--dx', (Math.cos(angle) * dist) + 'vmin');
+      s.style.setProperty('--dy', (Math.sin(angle) * dist) + 'vmin');
+      s.style.background = PALETTE[i % PALETTE.length];
+      celebrate.appendChild(s); // inside the overlay so they render above it
+      setTimeout(() => s.remove(), 800);
+    }
+  }
+
+  function startShout(f) {
+    const line = SHOUT_LINES[Math.floor(Math.random() * SHOUT_LINES.length)];
+    showCelebrate({ big: '', label: '', confetti: 30, duration: 5600 });
+    cBig.style.whiteSpace = 'nowrap';
+    renderPhrase({ text: 'SHOUT OUT', anim: 'slam2' });
+    shoutSparks();
+    let beat = 0;
+    shoutInterval = setInterval(() => {
+      beat++;
+      if (beat === 1) {
+        celebrate.classList.add('invert');
+        renderPhrase({ text: '★ ' + f + ' ★', anim: 'wave' });
+        spawnConfetti(50, PALETTE_INVERT);
+        shoutSparks();
+      } else if (beat === 2) {
+        celebrate.classList.remove('invert');
+        renderPhrase({ text: '★ ' + f + ' ★', anim: 'bounce2' });
+        cLabel.textContent = line;
+        spawnConfetti(70, PALETTE);
+        shoutSparks();
+      } else {
+        clearInterval(shoutInterval);
+        shoutInterval = null;
+      }
+    }, 1400);
+  }
+
   // End-card mode: jump straight to the loop so a clean clip can be recorded
   // for the edit without doing 100 reps first.
   function startEndCard() {
@@ -1006,10 +1056,10 @@
       showCelebrate({ big: '50', label: 'Halfway', invert: true, confetti: 80, duration: 2500 });
       const f = pickFollower();
       if (f) {
-        // Chain a follower shout-out card right after the halfway takeover.
+        // Chain the follower shout-out show right after the halfway takeover.
         shoutTimeout = setTimeout(() => {
           shoutTimeout = null;
-          showCelebrate({ big: f, label: 'Shout out', confetti: 45, duration: 2200, fitBig: true });
+          startShout(f);
         }, 2600);
       }
     } else if (bestRank === 2) {
