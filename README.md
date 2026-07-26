@@ -40,6 +40,8 @@ Voice needs Chrome (or another Chromium browser) and an internet connection; aud
 
 **Timer.** Starts on rep 1 or on the "start" voice command. A manually stopped clock is never restarted by counting (spoken or tapped); only `S` or "start" resumes it. Auto-freezes at rep 100 to lock the final time.
 
+**Screen wake lock.** While the clock is running or the end card loop is playing, the page holds a screen wake lock so a laptop or iPad left untouched during a set never dims or sleeps on camera. Released on reset, re-acquired automatically if the tab is backgrounded and returned to. Requires Chrome or Safari 16.4+; silently does nothing elsewhere.
+
 **Milestone celebrations.** Milestones are detected by checking every integer crossed between the old and new count, because voice can jump the count past one (e.g. 48 to 52):
 
 - Every 10: non-blocking gold flash on the number plus a radial spark burst. Taps keep working.

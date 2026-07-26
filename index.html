@@ -417,6 +417,7 @@
     <ul>
       <li><kbd>S</kbd> or say <span class="say">"stop"</span> / <span class="say">"pause"</span> &mdash; freeze the clock</li>
       <li><kbd>S</kbd> again or say <span class="say">"start"</span> &mdash; resume (also starts the clock before rep 1)</li>
+      <li>The screen stays awake while the clock runs &mdash; no mid-set dimming</li>
     </ul>
     <h2>Reset</h2>
     <ul>
@@ -539,6 +540,7 @@
     running = true;
     startStamp = performance.now();
     rafId = requestAnimationFrame(tick);
+    requestWake();
   }
 
   function stopClock() {
@@ -554,9 +556,24 @@
     if (running) { stopClock(); } else { startClock(); }
   }
 
+  // Keep the screen awake while a set (or the end card) is on camera —
+  // a laptop or iPad left untouched mid-set must never dim on film.
+  let wakeLock = null;
+  function requestWake() {
+    if (!('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then((l) => { wakeLock = l; }).catch(() => {});
+  }
+  function releaseWake() {
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && (running || ctaInterval)) requestWake();
+  });
+
   function resetAll() {
     hideCelebrate();
     clearCountAnim();
+    releaseWake();
     n = 0;
     el.textContent = n;
     started = false;
@@ -915,6 +932,7 @@
     }
     nextPhrase();
     ctaInterval = setInterval(nextPhrase, 2200);
+    requestWake();
   }
 
   // End-card mode: jump straight to the loop so a clean clip can be recorded
