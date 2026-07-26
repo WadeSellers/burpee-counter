@@ -23,7 +23,7 @@ One page of vanilla HTML, CSS, and JavaScript (`index.html`), plus a small PWA s
 | `R` | Full reset (count and clock to zero) |
 | `V` or the Voice button (top left) | Toggle voice recognition. Red dot = listening. |
 | `E` | End-card mode: jump straight to the follow/like/share loop, for recording a clean outro clip |
-| `O` or the Options button (bottom left) | Open the options menu: animation style, day-one date, end card phrases |
+| `O` or the Options button (bottom left) | Open the options menu: animation style, day counter, shout-out pool, end card phrases |
 | Guide button (bottom right) | In-app reference for all of the above |
 
 ### Voice commands
@@ -46,7 +46,7 @@ Voice needs Chrome (or another Chromium browser) and an internet connection; aud
 
 - Every 10: non-blocking gold flash on the number plus a radial spark burst. Taps keep working.
 - 25 and 75: roughly 1.6s full-screen invert (white background, black number, "Quarter down" / "Three quarters") with confetti. The overlay uses `pointer-events: none`, so taps during it still count reps.
-- 50: roughly 2.5s bigger invert takeover, "Halfway".
+- 50: roughly 2.5s bigger invert takeover, "Halfway" — followed by a random follower shout-out card (~2.2s) when the shout-out pool has handles.
 - 100: sticky finale. Black screen, gold "100", "Done", the locked final time, heavy confetti. Stays until any tap or keypress.
 
 **Post-100 CTA loop.** Four seconds after the finale, an endless attention loop starts (the video end card): FOLLOW (letter wave), LIKE (red beating heart), SHARE THIS (bounce), 100 EVERY DAY (slam), SEE YOU TOMORROW (wiggle). Each phrase flips the background between black and white, fires confetti, and auto-fits to the screen width. The final time stays pinned. Runs until dismissed.
@@ -55,9 +55,11 @@ Voice needs Chrome (or another Chromium browser) and an internet connection; aud
 
 **Count animations.** Each rep lands with one of nine animations: zoom pop, sky drop, spin, jelly, neon flicker, flip board, punch, odometer, slot-machine scramble. Jelly is the default; Random mode rotates through all of them, never the same one twice in a row. The choice is remembered per device.
 
-**Day badge.** A gold "DAY N" badge above the title, computed from a day-one date set in Options (default 2026-07-02). It rolls over at local midnight, feeds the rep-100 finale label ("Day N done"), and is available to end card phrases via the `{day}` token. Clearing the date hides the badge and restores the original layout proportions.
+**Day badge.** A gold "DAY N" badge above the title, computed from a day-one date set in Options (default 2026-07-02). Alternatively, type today's day number directly: the start date is recalibrated so today equals that day, and the two fields stay in sync. The badge rolls over at local midnight, feeds the rep-100 finale label ("Day N done"), and is available to end card phrases via the `{day}` token. Clearing the date hides the badge and restores the original layout proportions.
 
-**Custom end card phrases.** The Options menu has a textarea, one phrase per line, that replaces the default FOLLOW/LIKE/SHARE loop (useful for day numbers and follower shout-outs, e.g. "THANKS @NANCY462"). `{day}` is substituted with the current day number, any line containing LIKE gets the beating heart treatment, and other lines rotate through the loop's animation set. Empty textarea = default loop. Persisted per device.
+**Shout-out pool.** A list of follower handles in Options, one per line. When the pool is non-empty, the counter picks a handle at random (uppercased, `@` added if missing) in two places: a dedicated shout-out card that chains right after the rep-50 "Halfway" takeover, and a "SHOUT OUT @HANDLE" phrase inserted into the default end card loop. Custom end card phrases can place the picked handle anywhere via the `{follower}` token; lines using `{follower}` are skipped when the pool is empty. One handle is picked per end-card run, and a fresh one for each rep-50 moment.
+
+**Custom end card phrases.** The Options menu has a textarea, one phrase per line, that replaces the default FOLLOW/LIKE/SHARE loop (useful for day numbers and follower shout-outs, e.g. "THANKS @NANCY462"). `{day}` is substituted with the current day number, `{follower}` with the randomly picked shout-out handle, any line containing LIKE gets the beating heart treatment, and other lines rotate through the loop's animation set. Empty textarea = default loop (which auto-gains a SHOUT OUT line when the pool has handles). Persisted per device.
 
 **Options menu (`O`).** Animation style, day-one date, and end card phrases. Every animation chip contains a live mini number that performs its animation on a loop while the menu is open, driven by the same engine as the big number (with chip-scaled keyframe overrides for the moves that travel in screen units). The demo loop starts when the menu opens and stops when it closes. While the menu's text fields are focused, global shortcuts are suspended so typing a phrase can't fire reps or resets.
 

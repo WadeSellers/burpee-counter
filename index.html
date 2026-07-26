@@ -426,7 +426,7 @@
     <h2>Milestones</h2>
     <ul>
       <li>Every 10 &mdash; gold sparks, keeps counting</li>
-      <li>25, 50, 75 &mdash; screen flips for a moment (taps still count)</li>
+      <li>25, 50, 75 &mdash; screen flips for a moment (taps still count); 50 follows with a random follower shout-out if you've added handles in Options</li>
       <li>100 &mdash; finale locks your time, then the follow/like/share loop runs until you tap or press a key</li>
       <li><kbd>E</kbd> &mdash; jump straight to that loop anytime, for recording a clean end card clip</li>
     </ul>
@@ -443,7 +443,6 @@
   <div class="card" id="optsCard">
     <h2>Count animation</h2>
     <div class="chips">
-      <button class="chip" data-anim="random"><span class="mini">7</span>Random (all of them)</button>
       <button class="chip" data-anim="zoom"><span class="mini">7</span>Zoom pop</button>
       <button class="chip" data-anim="drop"><span class="mini">7</span>Sky drop</button>
       <button class="chip" data-anim="spin"><span class="mini">7</span>Spin</button>
@@ -453,11 +452,16 @@
       <button class="chip" data-anim="punch"><span class="mini">7</span>Punch</button>
       <button class="chip" data-anim="odo"><span class="mini">7</span>Odometer</button>
       <button class="chip" data-anim="scramble"><span class="mini">7</span>Slot scramble</button>
+      <button class="chip" data-anim="random"><span class="mini">7</span>Random (all of them)</button>
     </div>
     <div class="opthint">The little numbers show each move live. Pick one to lock it in &mdash; saved on this device.</div>
     <h2>Day counter</h2>
     <input type="date" id="startDate" class="optfield">
-    <div class="opthint">Day 1 date. The gold DAY badge counts up from here &mdash; clear the date to hide it.</div>
+    <input type="number" id="dayNum" class="optfield" min="1" max="9999" placeholder="or just type today's day number">
+    <div class="opthint">Set either one &mdash; they stay in sync, and the gold DAY badge keeps counting up daily. Clear the date to hide it.</div>
+    <h2>Shout-out pool</h2>
+    <textarea id="shoutList" class="optfield" rows="3" spellcheck="false" placeholder="@nancy462&#10;@another_follower"></textarea>
+    <div class="opthint">Follower handles, one per line. The counter picks one at random: a shout-out card right after the 50 celebration, and a SHOUT OUT line in the end card ({follower} in your own phrases).</div>
     <h2>End card phrases</h2>
     <textarea id="ctaText" class="optfield" rows="5" spellcheck="false" placeholder="FOLLOW&#10;LIKE&#10;SHARE THIS&#10;100 EVERY DAY&#10;SEE YOU TOMORROW"></textarea>
     <div class="opthint">One per line &mdash; shout-outs welcome ("THANKS @NANCY462"). {day} becomes the day number. Lines with LIKE get the beating heart. Empty = the standard loop.</div>
@@ -572,6 +576,7 @@
 
   function resetAll() {
     hideCelebrate();
+    if (shoutTimeout) { clearTimeout(shoutTimeout); shoutTimeout = null; }
     clearCountAnim();
     releaseWake();
     n = 0;
@@ -813,6 +818,7 @@
   let celebrateSticky = false;
   let ctaInterval = null;
   let ctaTimeout = null;
+  let shoutTimeout = null;
 
   const PALETTE = ['#FFD700', '#ffffff', '#bbbbbb', '#FFD700'];
   const PALETTE_INVERT = ['#FFD700', '#111111', '#555555', '#FFD700'];
@@ -842,6 +848,7 @@
     cConfetti.innerHTML = '';
     cBig.className = '';
     cBig.style.fontSize = '';
+    cBig.style.whiteSpace = '';
     if (celebrateTimer) { clearTimeout(celebrateTimer); celebrateTimer = null; }
     if (ctaInterval) { clearInterval(ctaInterval); ctaInterval = null; }
     if (ctaTimeout) { clearTimeout(ctaTimeout); ctaTimeout = null; }
@@ -849,7 +856,13 @@
 
   function showCelebrate(opts) {
     hideCelebrate();
+    if (shoutTimeout) { clearTimeout(shoutTimeout); shoutTimeout = null; }
     cBig.textContent = opts.big;
+    if (opts.fitBig) {
+      // Long text (follower handles) has to be measured, not sized in vw.
+      cBig.style.whiteSpace = 'nowrap';
+      fitText(cBig, window.innerWidth * 0.9, window.innerHeight * 0.5);
+    }
     cLabel.textContent = opts.label || '';
     cTime.textContent = opts.time || '';
     if (opts.invert) celebrate.classList.add('invert');
@@ -883,12 +896,21 @@
   let customCta = store.get('ctaLines', []);
 
   function activeCtaPhrases() {
-    if (!customCta.length) return CTA_PHRASES;
+    const follower = pickFollower(); // one pick per end-card run
+    if (!customCta.length) {
+      const base = CTA_PHRASES.slice();
+      if (follower) base.splice(2, 0, { text: 'SHOUT OUT ' + follower, anim: 'slam2' });
+      return base;
+    }
     return customCta.map((line, i) => {
-      const text = line.replace(/\{day\}/gi, String(dayNumber() || '?')).toUpperCase();
+      if (/\{follower\}/i.test(line) && !follower) return null; // no pool, skip the line
+      const text = line
+        .replace(/\{day\}/gi, String(dayNumber() || '?'))
+        .replace(/\{follower\}/gi, follower)
+        .toUpperCase();
       const heart = text.indexOf('LIKE') !== -1;
       return { text: text, anim: heart ? 'beat' : CTA_ANIM_CYCLE[i % CTA_ANIM_CYCLE.length], heart: heart };
-    });
+    }).filter(Boolean);
   }
 
   function renderPhrase(p) {
@@ -982,6 +1004,14 @@
       ctaTimeout = setTimeout(startCta, 4000);
     } else if (bestRank === 3) {
       showCelebrate({ big: '50', label: 'Halfway', invert: true, confetti: 80, duration: 2500 });
+      const f = pickFollower();
+      if (f) {
+        // Chain a follower shout-out card right after the halfway takeover.
+        shoutTimeout = setTimeout(() => {
+          shoutTimeout = null;
+          showCelebrate({ big: f, label: 'Shout out', confetti: 45, duration: 2200, fitBig: true });
+        }, 2600);
+      }
     } else if (bestRank === 2) {
       const label = bestM === 25 ? 'Quarter down' : (bestM === 75 ? 'Three quarters' : '');
       showCelebrate({ big: String(bestM), label: label, invert: true, confetti: 45, duration: 1600 });
@@ -1115,6 +1145,7 @@
 
   function renderBadge() {
     const d = dayNumber();
+    dayNumInput.value = d > 0 ? d : '';
     const text = d > 0 ? 'DAY ' + d : '';
     if (text === dayBadge.textContent) return;
     dayBadge.textContent = text;
@@ -1129,6 +1160,38 @@
     renderBadge();
   });
   setInterval(renderBadge, 60000); // rolls the badge over at midnight
+
+  // Manual day number: typing "214" recalibrates the start date so today is
+  // day 214, and the badge keeps counting up daily from there.
+  const dayNumInput = document.getElementById('dayNum');
+  dayNumInput.addEventListener('change', () => {
+    const v = parseInt(dayNumInput.value, 10);
+    if (!v || v < 1) return;
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (v - 1));
+    const pad = (x) => String(x).padStart(2, '0');
+    startDate = start.getFullYear() + '-' + pad(start.getMonth() + 1) + '-' + pad(start.getDate());
+    store.set('startDate', startDate);
+    startDateInput.value = startDate;
+    renderBadge();
+  });
+
+  /* ---------- Shout-out pool ---------- */
+
+  const shoutList = document.getElementById('shoutList');
+  let shoutPool = store.get('shoutPool', []);
+  shoutList.value = shoutPool.join('\n');
+  shoutList.addEventListener('input', () => {
+    shoutPool = shoutList.value.split('\n').map((s) => s.trim()).filter(Boolean);
+    store.set('shoutPool', shoutPool);
+  });
+
+  function pickFollower() {
+    if (!shoutPool.length) return '';
+    let h = shoutPool[Math.floor(Math.random() * shoutPool.length)];
+    if (h[0] !== '@') h = '@' + h;
+    return h.toUpperCase();
+  }
 
   /* ---------- End-card phrase editor ---------- */
 
